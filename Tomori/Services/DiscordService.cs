@@ -74,26 +74,38 @@ internal class DiscordService : BackgroundService
 
     private async Task OnMessageReceived(SocketMessage message)
     {
+        if (message.Author.Id != Constants.KarutaID)
+            return;
         Console.WriteLine(message.Content);
         await ParseKarutaKluEmbed(message);
+        await ParseDropMessage(message);
+
+    }
+
+    private async Task ParseDropMessage(SocketMessage message)
+    {
+        var cardDropMatch = KarutaRegex.DropMessageRegex().Match(message.Content);
+        
+        if (!cardDropMatch.Success)
+            return;
+
+        var cardCountStr = cardDropMatch.Groups[1].Value;
+        var cardCount = int.Parse(cardCountStr);
+        try
+        {
+            await HandleDropMessage(message, cardCount);
+
+        }
+        catch (Exception e)
+        {
+            _logger.LogCritical("Drop exception: {Message}", e.Message);
+        }
+
     }
 
     private async Task ParseKarutaKluEmbed(SocketMessage message)
     {
-        if (message.Author.Id != Constants.KarutaID)
-            return;
-
         var embeds = message.Embeds;
-
-        var cardDropMatch = KarutaRegex.DropMessageRegex().Match(message.Content);
-        if (cardDropMatch.Success)
-        {
-            var cardCountStr = cardDropMatch.Groups[1].Value;
-            var cardCount = int.Parse(cardCountStr);
-            await HandleDropMessage(message, cardCount);
-            return;
-        }
-
 
         if (embeds.Count != 1)
             return;
@@ -126,7 +138,7 @@ internal class DiscordService : BackgroundService
 
         var listChars = _cardModule.ReadTextFromCard(picture, cardCount);
 
-        foreach(var character in listChars)
+        foreach (var character in listChars)
         {
             Console.WriteLine(character);
         }

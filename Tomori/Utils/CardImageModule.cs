@@ -20,8 +20,8 @@ internal class CardImageModule
 
         for(int i = 0; i < cardCount; i++)
         {
-            var croppedCharacter = image.Clone(im => im.Crop(new Rectangle(48 + i * 276, 63 + 0 * 249, 185, 50)).GaussianSharpen(0.8f));
-            var croppedSeries = image.Clone(im => im.Crop(new Rectangle(48 + i * 276, 63 + 1 * 249, 185, 50)).GaussianSharpen(0.8f));
+            var croppedCharacter = image.Clone(im => im.Crop(new Rectangle(48 + i * 276, 59 + 0 * 253, 184, 45)).BinaryThreshold(0.21f).GaussianSharpen(0.8f));
+            var croppedSeries = image.Clone(im => im.Crop(new Rectangle(48 + i * 276, 59 + 1 * 253, 184, 45)).BinaryThreshold(0.21f).GaussianSharpen(0.8f));
 
             using var characterBuffer = new MemoryStream(1 << 20);
             using var seriesBuffer = new MemoryStream(1 << 20);
@@ -29,15 +29,21 @@ internal class CardImageModule
             croppedCharacter.SaveAsPng(characterBuffer);
             croppedSeries.SaveAsPng(seriesBuffer);
 
-            using var pixCharacter = Pix.LoadFromMemory(characterBuffer.ToArray());
-            using var pixSeries = Pix.LoadFromMemory(seriesBuffer.ToArray());
+            string characterText;
+            string seriesText;
 
-            using var characterPage = _engine.Process(pixCharacter);
-            using var seriesPage = _engine.Process(pixSeries);
+            {
+                using var pixCharacter = Pix.LoadFromMemory(characterBuffer.ToArray());
+                using var characterPage = _engine.Process(pixCharacter);
+                characterText = characterPage.GetText().Replace("\n", " ").Replace("  ", " ").Trim();
+            }
 
-            var characterText = characterPage.GetText().Replace("\n", " ").Replace("  ", " ").Trim();
-            var seriesText = seriesPage.GetText().Replace("\n", " ").Replace("  ", " ").Trim();
-
+            {
+                using var pixSeries = Pix.LoadFromMemory(seriesBuffer.ToArray());
+                using var seriesPage = _engine.Process(pixSeries);
+                seriesText = seriesPage.GetText().Replace("\n", " ").Replace("  ", " ").Trim();
+            }
+           
             listRes.Add(new CardData(characterText, seriesText));
 
         }
