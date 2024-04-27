@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
+using Tomori.Utils;
 
 namespace Tomori.Services;
 
@@ -12,12 +13,16 @@ internal class DiscordService : BackgroundService
     private DiscordSocketClient _client;
     private IConfiguration _config;
     private ILogger<DiscordService> _logger;
+    private HttpClient _httpClient;
 
-    public DiscordService(IConfiguration configuration, ILogger<DiscordService> logger)
+    private CardImageModule _cardModule;
+
+    public DiscordService(IConfiguration configuration, ILogger<DiscordService> logger, HttpClient httpClient, CardImageModule cardImageModule)
     {
         _config = configuration;
         _logger = logger;
-
+        _httpClient = httpClient;
+        _cardModule = cardImageModule;
 
         ConfigureDiscordClient();
     }
@@ -67,20 +72,28 @@ internal class DiscordService : BackgroundService
         return Task.CompletedTask;
     }
 
-    private Task OnMessageReceived(SocketMessage message)
+    private async Task OnMessageReceived(SocketMessage message)
     {
         Console.WriteLine(message.Content);
-        ParseKarutaKluEmbed(message);
-
-        return Task.CompletedTask;
+        await ParseKarutaKluEmbed(message);
     }
 
-    private void ParseKarutaKluEmbed(SocketMessage message)
+    private async Task ParseKarutaKluEmbed(SocketMessage message)
     {
         if (message.Author.Id != Constants.KarutaID)
             return;
 
         var embeds = message.Embeds;
+
+        var cardDropMatch = KarutaRegex.DropMessageRegex().Match(message.Content);
+        if (cardDropMatch.Success)
+        {
+            var cardCountStr = cardDropMatch.Groups[1].Value;
+            var cardCount = int.Parse(cardCountStr);
+            await HandleDropMessage(message, cardCount);
+            return;
+        }
+
 
         if (embeds.Count != 1)
             return;
@@ -89,15 +102,34 @@ internal class DiscordService : BackgroundService
         if (embed.Description.Contains("Wishlisted"))
         {
             ParseKarutaKluEmbedSingle(embed.Description);
+            return;
         }
 
-        else if (embed.Title == "Character Results")
+        if (embed.Title == "Character Results")
         {
             ParseKarutaKluEmbedMultiple(embed.Fields.First().Value);
+            return;
         }
 
-        return;
+    }
 
+    private async Task HandleDropMessage(SocketMessage message, int cardCount)
+    {
+        if (message.Attachments.Count == 0)
+        {
+            _logger.LogError("No picture drop for {Message}", message.Content);
+            return;
+        }
+
+        var attachment = message.Attachments.First();
+        var picture = await _httpClient.GetByteArrayAsync(attachment.Url);
+
+        var listChars = _cardModule.ReadTextFromCard(picture, cardCount);
+
+        foreach(var character in listChars)
+        {
+            Console.WriteLine(character);
+        }
     }
 
     private void ParseKarutaKluEmbedMultiple(string description)

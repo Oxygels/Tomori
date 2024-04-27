@@ -16,4 +16,7 @@ internal static partial class KarutaRegex
 
     [GeneratedRegex(@"Character · \*\*(.+)\*\*\nSeries · \*\*(.+)\*\*\nWishlisted · \*\*(\d+)\*\*")]
     public static partial Regex SingleCharRegex();
+
+    [GeneratedRegex(@"is dropping (\d+) cards!")]
+    public static partial Regex DropMessageRegex();
 }
